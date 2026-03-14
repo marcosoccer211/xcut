@@ -1,0 +1,1528 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>XCut — 纯浏览器 AI 视频字幕编辑器</title>
+<style>
+/* ============================================
+   FONTS
+   ============================================ */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Noto+Sans+SC:wght@300;400;500;600;700&display=swap');
+
+/* ============================================
+   CSS CUSTOM PROPERTIES
+   ============================================ */
+:root {
+  --primary: #7c3aed;
+  --primary-light: #a78bfa;
+  --primary-ultra-light: #ede9fe;
+  --primary-bg: #f5f3ff;
+  --accent: #2563eb;
+  --accent-light: #93c5fd;
+  --surface: #ffffff;
+  --surface-dim: #f8fafc;
+  --surface-warm: #faf8f5;
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-tertiary: #94a3b8;
+  --border: #e2e8f0;
+  --border-light: #f1f5f9;
+
+  --title-size: clamp(2rem, 5vw, 4rem);
+  --h2-size: clamp(1.5rem, 3.5vw, 2.75rem);
+  --h3-size: clamp(1.1rem, 2vw, 1.5rem);
+  --body-size: clamp(0.85rem, 1.4vw, 1.125rem);
+  --small-size: clamp(0.7rem, 1vw, 0.875rem);
+  --slide-padding: clamp(2rem, 5vw, 6rem);
+  --content-gap: clamp(1rem, 2.5vw, 2.5rem);
+}
+
+/* ============================================
+   RESET & BASE
+   ============================================ */
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+html, body {
+  height: 100%;
+  overflow-x: hidden;
+  font-family: 'Inter', 'Noto Sans SC', system-ui, sans-serif;
+  color: var(--text-primary);
+  background: var(--surface);
+  -webkit-font-smoothing: antialiased;
+}
+
+html {
+  scroll-snap-type: y mandatory;
+  scroll-behavior: smooth;
+}
+
+/* ============================================
+   SLIDE BASE
+   ============================================ */
+.slide {
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+  scroll-snap-align: start;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+.slide-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  max-height: 100%;
+  overflow: hidden;
+  padding: var(--slide-padding);
+}
+
+/* ============================================
+   REVEAL ANIMATIONS
+   ============================================ */
+.reveal {
+  opacity: 0;
+  transform: translateY(32px);
+  transition: opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1),
+              transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.reveal.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+.reveal.delay-1 { transition-delay: 0.1s; }
+.reveal.delay-2 { transition-delay: 0.2s; }
+.reveal.delay-3 { transition-delay: 0.3s; }
+.reveal.delay-4 { transition-delay: 0.4s; }
+.reveal.delay-5 { transition-delay: 0.5s; }
+
+.reveal-scale {
+  opacity: 0;
+  transform: scale(0.92);
+  transition: opacity 0.7s ease, transform 0.7s ease;
+}
+.reveal-scale.visible {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.reveal-left {
+  opacity: 0;
+  transform: translateX(-40px);
+  transition: opacity 0.7s ease, transform 0.7s ease;
+}
+.reveal-left.visible {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.reveal-right {
+  opacity: 0;
+  transform: translateX(40px);
+  transition: opacity 0.7s ease, transform 0.7s ease;
+}
+.reveal-right.visible {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+/* ============================================
+   NAVIGATION
+   ============================================ */
+.nav-dots {
+  position: fixed;
+  right: clamp(12px, 2vw, 24px);
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  z-index: 100;
+}
+.nav-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-tertiary);
+  opacity: 0.3;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  border: none;
+}
+.nav-dot:hover { opacity: 0.6; }
+.nav-dot.active {
+  opacity: 1;
+  background: var(--primary);
+  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.2);
+}
+
+.progress-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--primary), var(--accent));
+  z-index: 200;
+  transition: width 0.3s ease;
+}
+
+/* ============================================
+   SLIDE 1 — HERO
+   ============================================ */
+.hero {
+  background: linear-gradient(145deg, #faf8ff 0%, #f0ecff 40%, #e8f4ff 100%);
+  position: relative;
+}
+.hero::before {
+  content: '';
+  position: absolute;
+  top: -30%;
+  right: -15%;
+  width: 60%;
+  height: 80%;
+  background: radial-gradient(ellipse, rgba(124, 58, 237, 0.06) 0%, transparent 70%);
+  pointer-events: none;
+}
+.hero::after {
+  content: '';
+  position: absolute;
+  bottom: -20%;
+  left: -10%;
+  width: 50%;
+  height: 60%;
+  background: radial-gradient(ellipse, rgba(37, 99, 235, 0.04) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+.hero .slide-content {
+  align-items: center;
+  text-align: center;
+  gap: var(--content-gap);
+}
+
+.hero-logo {
+  width: clamp(56px, 8vw, 80px);
+  height: auto;
+  filter: drop-shadow(0 4px 20px rgba(124, 58, 237, 0.25));
+}
+
+.hero-title {
+  font-size: clamp(3rem, 8vw, 6rem);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1;
+  background: linear-gradient(135deg, var(--text-primary) 30%, var(--primary) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.hero-subtitle {
+  font-size: clamp(1rem, 2vw, 1.375rem);
+  color: var(--text-secondary);
+  max-width: 560px;
+  line-height: 1.7;
+  font-weight: 400;
+}
+
+.hero-badges {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.badge {
+  padding: 6px 16px;
+  border-radius: 100px;
+  font-size: var(--small-size);
+  font-weight: 500;
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,0.7);
+  backdrop-filter: blur(8px);
+  color: var(--text-secondary);
+}
+.badge.purple {
+  background: var(--primary-ultra-light);
+  border-color: rgba(124, 58, 237, 0.15);
+  color: var(--primary);
+}
+
+/* ============================================
+   SLIDE 2 — PROBLEM / PAIN POINTS
+   ============================================ */
+.slide-problem {
+  background: var(--surface);
+}
+.problem-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+  gap: clamp(12px, 2vw, 20px);
+  max-width: 960px;
+  width: 100%;
+}
+.problem-card {
+  padding: clamp(20px, 3vw, 32px);
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  background: var(--surface-dim);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+.problem-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 40px rgba(0,0,0,0.06);
+}
+.problem-icon {
+  font-size: clamp(1.5rem, 3vw, 2rem);
+  margin-bottom: 12px;
+}
+.problem-card h3 {
+  font-size: var(--h3-size);
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: var(--text-primary);
+}
+.problem-card p {
+  font-size: var(--body-size);
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+.section-label {
+  font-size: var(--small-size);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  color: var(--primary);
+  margin-bottom: 8px;
+}
+.section-title {
+  font-size: var(--h2-size);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  margin-bottom: clamp(16px, 3vw, 32px);
+}
+
+/* ============================================
+   SLIDE 3 — SOLUTION / OVERVIEW
+   ============================================ */
+.slide-solution {
+  background: linear-gradient(180deg, var(--surface) 0%, var(--surface-warm) 100%);
+}
+.solution-flow {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  max-width: 960px;
+  width: 100%;
+}
+.flow-step {
+  flex: 1;
+  text-align: center;
+  padding: clamp(16px, 2vw, 28px);
+  position: relative;
+}
+.flow-step:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  top: 50%;
+  width: 0;
+  height: 0;
+  border-top: 8px solid transparent;
+  border-bottom: 8px solid transparent;
+  border-left: 10px solid var(--border);
+  transform: translateY(-50%);
+}
+.flow-number {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 1rem;
+  margin-bottom: 12px;
+  color: white;
+}
+.flow-number.n1 { background: linear-gradient(135deg, #7c3aed, #6d28d9); }
+.flow-number.n2 { background: linear-gradient(135deg, #2563eb, #1d4ed8); }
+.flow-number.n3 { background: linear-gradient(135deg, #0891b2, #0e7490); }
+.flow-number.n4 { background: linear-gradient(135deg, #059669, #047857); }
+.flow-step h3 {
+  font-size: clamp(0.9rem, 1.5vw, 1.1rem);
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+.flow-step p {
+  font-size: var(--small-size);
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+/* ============================================
+   SLIDE 4 — FEATURE: AI SUBTITLE
+   ============================================ */
+.slide-feature {
+  background: var(--surface);
+}
+.feature-split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: clamp(24px, 4vw, 60px);
+  max-width: 1100px;
+  width: 100%;
+  align-items: center;
+}
+.feature-text h2 {
+  font-size: var(--h2-size);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin-bottom: 16px;
+}
+.feature-text p {
+  font-size: var(--body-size);
+  color: var(--text-secondary);
+  line-height: 1.7;
+  margin-bottom: 20px;
+}
+.feature-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.tag {
+  padding: 5px 14px;
+  border-radius: 8px;
+  font-size: var(--small-size);
+  font-weight: 500;
+  background: var(--primary-ultra-light);
+  color: var(--primary);
+}
+.tag.blue {
+  background: #eff6ff;
+  color: var(--accent);
+}
+
+/* Mock UI panels */
+.mock-panel {
+  background: #0e0e18;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+  aspect-ratio: 4 / 3;
+  display: flex;
+  flex-direction: column;
+}
+.mock-topbar {
+  height: 32px;
+  background: rgba(0,0,0,0.4);
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.mock-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+.mock-dot.r { background: #ff5f57; }
+.mock-dot.y { background: #febc2e; }
+.mock-dot.g { background: #28c840; }
+.mock-body {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+}
+.mock-sidebar {
+  width: 36px;
+  background: rgba(255,255,255,0.03);
+  border-right: 1px solid rgba(255,255,255,0.06);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: 12px;
+  gap: 8px;
+}
+.mock-sidebar-icon {
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  background: rgba(255,255,255,0.06);
+}
+.mock-sidebar-icon.active {
+  background: rgba(96, 165, 250, 0.2);
+  box-shadow: 0 0 8px rgba(96, 165, 250, 0.3);
+}
+.mock-left-panel {
+  width: 100px;
+  background: rgba(0,0,0,0.1);
+  border-right: 1px solid rgba(255,255,255,0.04);
+  padding: 10px 8px;
+}
+.mock-panel-label {
+  font-size: 7px;
+  color: rgba(255,255,255,0.3);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-bottom: 8px;
+}
+.mock-btn {
+  width: 100%;
+  height: 18px;
+  border-radius: 6px;
+  background: rgba(96, 165, 250, 0.15);
+  border: 1px solid rgba(96, 165, 250, 0.2);
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 6px;
+  color: rgba(165, 200, 255, 0.7);
+}
+.mock-option {
+  width: 100%;
+  height: 14px;
+  border-radius: 4px;
+  background: rgba(255,255,255,0.04);
+  margin-bottom: 4px;
+}
+.mock-canvas-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 8px;
+  gap: 6px;
+}
+.mock-canvas {
+  flex: 1;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #1a1a2e, #16213e);
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.mock-video-frame {
+  width: 70%;
+  height: 65%;
+  background: linear-gradient(180deg, #334155 0%, #1e293b 100%);
+  border-radius: 4px;
+  position: relative;
+}
+.mock-subtitle-bar {
+  position: absolute;
+  bottom: 8%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0,0,0,0.65);
+  padding: 3px 10px;
+  border-radius: 4px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+}
+.mock-sub-en {
+  font-size: 6px;
+  color: #fff;
+  white-space: nowrap;
+}
+.mock-sub-zh {
+  font-size: 5.5px;
+  color: rgba(255,255,255,0.7);
+  white-space: nowrap;
+}
+.mock-controls {
+  height: 22px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 4px;
+}
+.mock-play-btn {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.1);
+  border: 1px solid rgba(255,255,255,0.15);
+}
+.mock-progress {
+  flex: 1;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255,255,255,0.08);
+  position: relative;
+  overflow: hidden;
+}
+.mock-progress-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  width: 35%;
+  border-radius: 2px;
+  background: linear-gradient(90deg, #3b82f6, #8b5cf6);
+}
+.mock-timeline {
+  height: 20px;
+  border-radius: 6px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.06);
+  display: flex;
+  align-items: center;
+  padding: 0 4px;
+  gap: 2px;
+}
+.mock-clip {
+  height: 12px;
+  border-radius: 3px;
+  background: rgba(96, 165, 250, 0.2);
+  border: 1px solid rgba(96, 165, 250, 0.3);
+}
+.mock-clip.gap {
+  background: rgba(0,0,0,0.3);
+  border-color: transparent;
+}
+.mock-playhead {
+  width: 1.5px;
+  height: 16px;
+  background: #ef4444;
+  border-radius: 1px;
+  box-shadow: 0 0 4px rgba(239, 68, 68, 0.6);
+}
+
+/* ============================================
+   SLIDE 5 — FEATURE: TIMELINE
+   ============================================ */
+.timeline-demo {
+  max-width: 800px;
+  width: 100%;
+  padding: clamp(20px, 3vw, 40px);
+  border-radius: 20px;
+  background: #0e0e18;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.12);
+}
+.timeline-track {
+  height: 48px;
+  border-radius: 10px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  display: flex;
+  align-items: center;
+  padding: 6px 8px;
+  gap: 4px;
+  position: relative;
+  margin-bottom: 16px;
+}
+.tl-clip {
+  height: 36px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 500;
+  color: rgba(255,255,255,0.6);
+  position: relative;
+}
+.tl-clip.a { flex: 3; background: rgba(96,165,250,0.2); border: 1px solid rgba(96,165,250,0.35); }
+.tl-clip.b { flex: 2; background: rgba(139,92,246,0.2); border: 1px solid rgba(139,92,246,0.35); }
+.tl-clip.c { flex: 2; background: rgba(34,197,94,0.2); border: 1px solid rgba(34,197,94,0.35); }
+.tl-gap { flex: 0.5; }
+.tl-handle {
+  position: absolute;
+  top: 0;
+  width: 6px;
+  height: 100%;
+  background: rgba(255,255,255,0.15);
+  border-radius: 3px;
+  cursor: ew-resize;
+}
+.tl-handle.left { left: 0; }
+.tl-handle.right { right: 0; }
+.tl-playhead-line {
+  position: absolute;
+  left: 32%;
+  top: -4px;
+  bottom: -4px;
+  width: 2px;
+  background: #ef4444;
+  border-radius: 1px;
+  box-shadow: 0 0 6px rgba(239, 68, 68, 0.6);
+  z-index: 2;
+}
+.tl-playhead-dot {
+  position: absolute;
+  top: -6px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 8px;
+  height: 8px;
+  background: #ef4444;
+  border-radius: 50%;
+}
+.timeline-actions {
+  display: flex;
+  gap: 8px;
+}
+.tl-action-btn {
+  padding: 6px 14px;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.05);
+  color: rgba(255,255,255,0.5);
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+/* ============================================
+   SLIDE 6 — FEATURE: CANVAS PREVIEW
+   ============================================ */
+.canvas-demo {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: clamp(12px, 2vw, 20px);
+  max-width: 900px;
+  width: 100%;
+}
+.canvas-card {
+  border-radius: 16px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.04);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+.canvas-card:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 16px 48px rgba(0,0,0,0.08);
+}
+.canvas-preview {
+  aspect-ratio: 16/9;
+  position: relative;
+  overflow: hidden;
+}
+.canvas-card-label {
+  padding: 12px 16px;
+  font-size: var(--small-size);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.canvas-card-desc {
+  padding: 0 16px 12px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+/* Canvas preview mocks */
+.cv-blur-bg {
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  filter: blur(12px);
+  transform: scale(1.1);
+  position: absolute;
+}
+.cv-video {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 60%;
+  height: 70%;
+  background: linear-gradient(180deg, #334155, #1e293b);
+  border-radius: 3px;
+  z-index: 1;
+}
+.cv-subtitle {
+  position: absolute;
+  bottom: 10%;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.cv-sub-netflix {
+  background: rgba(0,0,0,0.7);
+  padding: 2px 8px;
+  border-radius: 3px;
+  font-size: 8px;
+  color: #fff;
+}
+.cv-sub-karaoke {
+  font-size: 8px;
+  color: #fbbf24;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.8);
+  font-weight: 600;
+}
+.cv-sub-outline {
+  font-size: 8px;
+  color: #fff;
+  text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000;
+}
+
+.cv-title-overlay {
+  position: absolute;
+  top: 12%;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2;
+  font-size: 10px;
+  font-weight: 700;
+  color: #fff;
+  text-shadow: 0 2px 8px rgba(0,0,0,0.5);
+  white-space: nowrap;
+}
+
+/* Ratio demos */
+.cv-ratio-169 .cv-video { width: 90%; height: 55%; }
+.cv-ratio-916 .cv-video { width: 36%; height: 80%; }
+.cv-ratio-169, .cv-ratio-916, .cv-ratio-11 {
+  background: linear-gradient(135deg, #1e293b, #0f172a);
+}
+.cv-ratio-11 .cv-video { width: 60%; height: 60%; }
+
+/* ============================================
+   SLIDE 7 — TECH STACK
+   ============================================ */
+.slide-tech {
+  background: linear-gradient(180deg, var(--surface-warm) 0%, var(--surface) 100%);
+}
+.tech-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr));
+  gap: clamp(10px, 1.5vw, 16px);
+  max-width: 960px;
+  width: 100%;
+}
+.tech-item {
+  padding: clamp(14px, 2vw, 24px);
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  transition: transform 0.3s ease;
+}
+.tech-item:hover { transform: translateY(-3px); }
+.tech-name {
+  font-size: clamp(0.85rem, 1.3vw, 1rem);
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+.tech-desc {
+  font-size: var(--small-size);
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+.tech-icon-tag {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+.tech-icon-tag.react { background: #e0f2fe; color: #0284c7; }
+.tech-icon-tag.vite { background: #fef3c7; color: #b45309; }
+.tech-icon-tag.ai { background: var(--primary-ultra-light); color: var(--primary); }
+.tech-icon-tag.canvas { background: #fce7f3; color: #be185d; }
+.tech-icon-tag.state { background: #ecfdf5; color: #059669; }
+.tech-icon-tag.export { background: #fff7ed; color: #c2410c; }
+
+/* ============================================
+   SLIDE 8 — ARCHITECTURE
+   ============================================ */
+.arch-diagram {
+  max-width: 800px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.arch-row {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+.arch-box {
+  padding: 14px 20px;
+  border-radius: 12px;
+  font-size: var(--small-size);
+  font-weight: 600;
+  text-align: center;
+  min-width: 120px;
+  position: relative;
+}
+.arch-box.ui {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  color: #1d4ed8;
+}
+.arch-box.logic {
+  background: var(--primary-ultra-light);
+  border: 1px solid #c4b5fd;
+  color: #6d28d9;
+}
+.arch-box.store {
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  color: #047857;
+}
+.arch-box.worker {
+  background: #fef3c7;
+  border: 1px solid #fcd34d;
+  color: #b45309;
+}
+.arch-box small {
+  display: block;
+  font-weight: 400;
+  font-size: 11px;
+  opacity: 0.7;
+  margin-top: 4px;
+}
+.arch-arrow {
+  display: flex;
+  justify-content: center;
+  color: var(--text-tertiary);
+  font-size: 18px;
+  line-height: 1;
+}
+
+/* ============================================
+   SLIDE 9 — HIGHLIGHTS / NUMBERS
+   ============================================ */
+.slide-highlights {
+  background: linear-gradient(145deg, #faf8ff, #f0ecff 60%, #e8f4ff);
+}
+.highlight-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr));
+  gap: clamp(12px, 2vw, 20px);
+  max-width: 800px;
+  width: 100%;
+}
+.highlight-card {
+  padding: clamp(20px, 3vw, 32px);
+  border-radius: 16px;
+  background: rgba(255,255,255,0.7);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255,255,255,0.8);
+  box-shadow: 0 4px 24px rgba(124, 58, 237, 0.05);
+  text-align: center;
+  transition: transform 0.3s ease;
+}
+.highlight-card:hover { transform: translateY(-4px); }
+.highlight-number {
+  font-size: clamp(2rem, 5vw, 3rem);
+  font-weight: 800;
+  background: linear-gradient(135deg, var(--primary), var(--accent));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  line-height: 1.2;
+}
+.highlight-label {
+  font-size: var(--body-size);
+  color: var(--text-secondary);
+  margin-top: 8px;
+  font-weight: 500;
+}
+
+/* ============================================
+   SLIDE 10 — CTA / END
+   ============================================ */
+.slide-cta {
+  background: linear-gradient(180deg, var(--surface) 0%, #faf8ff 100%);
+}
+.cta-content {
+  text-align: center;
+  max-width: 600px;
+}
+.cta-content h2 {
+  font-size: var(--h2-size);
+  font-weight: 700;
+  margin-bottom: 16px;
+  letter-spacing: -0.02em;
+}
+.cta-content p {
+  font-size: var(--body-size);
+  color: var(--text-secondary);
+  line-height: 1.7;
+  margin-bottom: 32px;
+}
+.cta-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 36px;
+  border-radius: 14px;
+  border: none;
+  font-size: 1rem;
+  font-weight: 600;
+  color: white;
+  background: linear-gradient(135deg, var(--primary), var(--accent));
+  box-shadow: 0 8px 32px rgba(124, 58, 237, 0.3);
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  text-decoration: none;
+}
+.cta-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 40px rgba(124, 58, 237, 0.4);
+}
+.cta-stack {
+  display: flex;
+  justify-content: center;
+  gap: 24px;
+  margin-top: 32px;
+}
+.cta-stack-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--small-size);
+  color: var(--text-tertiary);
+}
+.cta-stack-item .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+.cta-stack-item .dot.purple { background: var(--primary); }
+.cta-stack-item .dot.blue { background: var(--accent); }
+.cta-stack-item .dot.green { background: #059669; }
+
+/* ============================================
+   RESPONSIVE
+   ============================================ */
+@media (max-width: 768px) {
+  .feature-split { grid-template-columns: 1fr; }
+  .canvas-demo { grid-template-columns: 1fr 1fr; }
+  .solution-flow { flex-direction: column; }
+  .flow-step:not(:last-child)::after { display: none; }
+  .nav-dots { display: none; }
+}
+@media (max-width: 500px) {
+  .canvas-demo { grid-template-columns: 1fr; }
+}
+@media (max-height: 600px) {
+  :root {
+    --slide-padding: clamp(1rem, 3vw, 2.5rem);
+    --content-gap: clamp(0.5rem, 1.5vw, 1rem);
+  }
+  .nav-dots { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.2s !important;
+  }
+  html { scroll-behavior: auto; }
+}
+
+/* Keyboard hint */
+.keyboard-hint {
+  position: fixed;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 11px;
+  color: var(--text-tertiary);
+  opacity: 0.5;
+  z-index: 100;
+  pointer-events: none;
+  transition: opacity 0.5s ease;
+}
+</style>
+</head>
+<body>
+
+<!-- Progress bar -->
+<div class="progress-bar" id="progressBar"></div>
+
+<!-- Navigation dots -->
+<nav class="nav-dots" id="navDots"></nav>
+
+<!-- Keyboard hint -->
+<div class="keyboard-hint" id="keyHint">按 ↑↓ 或滚轮切换页面</div>
+
+<!-- =============================================
+     SLIDE 1 — HERO
+     ============================================= -->
+<section class="slide hero" data-slide="0">
+  <div class="slide-content">
+    <svg class="hero-logo reveal" width="64" height="61" viewBox="0 0 48 46" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M25.946 44.938c-.664.845-2.021.375-2.021-.698V33.937a2.26 2.26 0 0 0-2.262-2.262H10.287c-.92 0-1.456-1.04-.92-1.788l7.48-10.471c1.07-1.497 0-3.578-1.842-3.578H1.237c-.92 0-1.456-1.04-.92-1.788L10.013.474c.214-.297.556-.474.92-.474h28.894c.92 0 1.456 1.04.92 1.788l-7.48 10.471c-1.07 1.498 0 3.579 1.842 3.579h11.377c.943 0 1.473 1.088.89 1.83L25.947 44.94z" fill="#7c3aed"/>
+    </svg>
+    <h1 class="hero-title reveal delay-1">XCut</h1>
+    <p class="hero-subtitle reveal delay-2">纯浏览器端 AI 视频字幕编辑器<br>语音识别、双语字幕、实时预览、一键导出</p>
+    <div class="hero-badges reveal delay-3">
+      <span class="badge purple">Whisper AI</span>
+      <span class="badge">零服务器</span>
+      <span class="badge">隐私安全</span>
+      <span class="badge">免费开源</span>
+    </div>
+  </div>
+</section>
+
+<!-- =============================================
+     SLIDE 2 — PAIN POINTS
+     ============================================= -->
+<section class="slide slide-problem" data-slide="1">
+  <div class="slide-content" style="align-items: center;">
+    <div class="section-label reveal">为什么做 XCUT</div>
+    <h2 class="section-title reveal delay-1">现有工具的痛点</h2>
+    <div class="problem-grid">
+      <div class="problem-card reveal delay-2">
+        <div class="problem-icon">💸</div>
+        <h3>订阅昂贵</h3>
+        <p>专业字幕软件月费几十到上百美元，对个人创作者不友好</p>
+      </div>
+      <div class="problem-card reveal delay-3">
+        <div class="problem-icon">☁️</div>
+        <h3>隐私泄露</h3>
+        <p>上传视频到云端处理，敏感内容面临数据安全风险</p>
+      </div>
+      <div class="problem-card reveal delay-4">
+        <div class="problem-icon">🔧</div>
+        <h3>流程割裂</h3>
+        <p>语音识别、翻译、字幕编辑、导出需要在多个工具间切换</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- =============================================
+     SLIDE 3 — SOLUTION FLOW
+     ============================================= -->
+<section class="slide slide-solution" data-slide="2">
+  <div class="slide-content" style="align-items: center;">
+    <div class="section-label reveal">一站式工作流</div>
+    <h2 class="section-title reveal delay-1">从视频到成品，四步完成</h2>
+    <div class="solution-flow reveal delay-2">
+      <div class="flow-step">
+        <div class="flow-number n1">1</div>
+        <h3>导入视频</h3>
+        <p>拖放或选择文件<br>支持 MP4/MOV/WebM</p>
+      </div>
+      <div class="flow-step">
+        <div class="flow-number n2">2</div>
+        <h3>AI 识别</h3>
+        <p>Whisper 本地运行<br>自动生成字幕文本</p>
+      </div>
+      <div class="flow-step">
+        <div class="flow-number n3">3</div>
+        <h3>编辑调整</h3>
+        <p>字幕/标题/背景/剪辑<br>实时 Canvas 预览</p>
+      </div>
+      <div class="flow-step">
+        <div class="flow-number n4">4</div>
+        <h3>导出 MP4</h3>
+        <p>一键导出视频<br>含字幕和所有特效</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- =============================================
+     SLIDE 4 — FEATURE: AI SUBTITLE
+     ============================================= -->
+<section class="slide slide-feature" data-slide="3">
+  <div class="slide-content" style="align-items: center;">
+    <div class="feature-split">
+      <div class="feature-text reveal-left">
+        <div class="section-label">核心功能</div>
+        <h2>AI 语音识别 + 双语字幕</h2>
+        <p>
+          内置 Whisper Small 模型，完全在浏览器本地运行。
+          支持 WebGPU 加速，自动降级到 CPU。
+          识别后一键翻译为中文，生成双语字幕。
+          提供 Netflix、描边、Karaoke 等多种样式预设。
+        </p>
+        <div class="feature-tags">
+          <span class="tag">Whisper Small</span>
+          <span class="tag">WebGPU 加速</span>
+          <span class="tag blue">英中翻译</span>
+          <span class="tag blue">4种样式预设</span>
+        </div>
+      </div>
+      <div class="reveal-right">
+        <div class="mock-panel">
+          <div class="mock-topbar">
+            <div class="mock-dot r"></div>
+            <div class="mock-dot y"></div>
+            <div class="mock-dot g"></div>
+          </div>
+          <div class="mock-body">
+            <div class="mock-sidebar">
+              <div class="mock-sidebar-icon active"></div>
+              <div class="mock-sidebar-icon"></div>
+              <div class="mock-sidebar-icon"></div>
+              <div class="mock-sidebar-icon"></div>
+            </div>
+            <div class="mock-left-panel">
+              <div class="mock-panel-label">字幕设置</div>
+              <div class="mock-btn">识别字幕</div>
+              <div class="mock-option"></div>
+              <div class="mock-option"></div>
+              <div class="mock-option" style="width: 70%;"></div>
+            </div>
+            <div class="mock-canvas-area">
+              <div class="mock-canvas">
+                <div class="mock-video-frame">
+                  <div class="mock-subtitle-bar">
+                    <span class="mock-sub-en">The future of AI is here</span>
+                    <span class="mock-sub-zh">AI 的未来已经到来</span>
+                  </div>
+                </div>
+              </div>
+              <div class="mock-controls">
+                <div class="mock-play-btn"></div>
+                <div class="mock-progress"><div class="mock-progress-fill"></div></div>
+              </div>
+              <div class="mock-timeline">
+                <div class="mock-clip" style="flex: 3;"></div>
+                <div class="mock-clip gap" style="flex: 0.5;"></div>
+                <div class="mock-clip" style="flex: 2;"></div>
+                <div class="mock-playhead"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- =============================================
+     SLIDE 5 — FEATURE: TIMELINE
+     ============================================= -->
+<section class="slide" data-slide="4" style="background: var(--surface-dim);">
+  <div class="slide-content" style="align-items: center;">
+    <div class="section-label reveal">非线性编辑</div>
+    <h2 class="section-title reveal delay-1">可视化时间轴剪辑</h2>
+    <div class="timeline-demo reveal-scale delay-2">
+      <div class="timeline-track">
+        <div class="tl-clip a">片段 A</div>
+        <div class="tl-gap"></div>
+        <div class="tl-clip b">片段 B
+          <div class="tl-handle left"></div>
+          <div class="tl-handle right"></div>
+        </div>
+        <div class="tl-gap"></div>
+        <div class="tl-clip c">片段 C</div>
+        <div class="tl-playhead-line">
+          <div class="tl-playhead-dot"></div>
+        </div>
+      </div>
+      <div class="timeline-actions">
+        <div class="tl-action-btn">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="3"/><path d="M8.12 8.12 12 12"/><path d="M20 4 8.12 15.88"/><circle cx="6" cy="18" r="3"/><path d="M14.8 14.8 20 20"/></svg>
+          分割
+        </div>
+        <div class="tl-action-btn">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+          删除
+        </div>
+        <div class="tl-action-btn" style="margin-left: auto; border-color: rgba(255,255,255,0.12);">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
+          拖拽修剪
+        </div>
+      </div>
+    </div>
+    <p class="reveal delay-3" style="max-width: 600px; text-align: center; color: var(--text-secondary); font-size: var(--body-size); line-height: 1.7; margin-top: 20px;">
+      在时间轴上自由分割、删除、修剪片段。点击空白区域跳转到下一片段，播放时自动跨越间隔，智能处理异步 seek。
+    </p>
+  </div>
+</section>
+
+<!-- =============================================
+     SLIDE 6 — CANVAS PREVIEW STYLES
+     ============================================= -->
+<section class="slide" data-slide="5" style="background: var(--surface);">
+  <div class="slide-content" style="align-items: center;">
+    <div class="section-label reveal">实时渲染</div>
+    <h2 class="section-title reveal delay-1">Canvas 画布，所见即所得</h2>
+    <div class="canvas-demo">
+      <div class="canvas-card reveal delay-2">
+        <div class="canvas-preview" style="background: linear-gradient(135deg, #667eea, #764ba2);">
+          <div class="cv-blur-bg" style="background: linear-gradient(135deg, #667eea, #764ba2);"></div>
+          <div class="cv-video"></div>
+          <div class="cv-subtitle"><span class="cv-sub-netflix">The future of AI is here</span></div>
+        </div>
+        <div class="canvas-card-label">Netflix 风格</div>
+        <div class="canvas-card-desc">半透明黑底白字，经典可读</div>
+      </div>
+      <div class="canvas-card reveal delay-3">
+        <div class="canvas-preview" style="background: linear-gradient(135deg, #f093fb, #f5576c);">
+          <div class="cv-blur-bg" style="background: linear-gradient(135deg, #f093fb, #f5576c);"></div>
+          <div class="cv-video"></div>
+          <div class="cv-title-overlay">XCut Demo</div>
+          <div class="cv-subtitle"><span class="cv-sub-karaoke">Karaoke 高亮样式</span></div>
+        </div>
+        <div class="canvas-card-label">标题 + Karaoke</div>
+        <div class="canvas-card-desc">标题叠加，字幕黄色高亮</div>
+      </div>
+      <div class="canvas-card reveal delay-4">
+        <div class="canvas-preview cv-ratio-916">
+          <div class="cv-video"></div>
+          <div class="cv-subtitle"><span class="cv-sub-outline">竖屏 9:16 描边字幕</span></div>
+        </div>
+        <div class="canvas-card-label">多比例适配</div>
+        <div class="canvas-card-desc">9:16 / 1:1 / 16:9 背景模糊填充</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- =============================================
+     SLIDE 7 — TECH STACK
+     ============================================= -->
+<section class="slide slide-tech" data-slide="6">
+  <div class="slide-content" style="align-items: center;">
+    <div class="section-label reveal">技术栈</div>
+    <h2 class="section-title reveal delay-1">现代前端，零后端依赖</h2>
+    <div class="tech-grid">
+      <div class="tech-item reveal delay-1">
+        <div class="tech-icon-tag react">React</div>
+        <div class="tech-name">React 19 + TypeScript</div>
+        <div class="tech-desc">最新 React 版本，完整类型安全</div>
+      </div>
+      <div class="tech-item reveal delay-2">
+        <div class="tech-icon-tag vite">Vite</div>
+        <div class="tech-name">Vite 8 + Tailwind v4</div>
+        <div class="tech-desc">极速构建，原子化 CSS</div>
+      </div>
+      <div class="tech-item reveal delay-2">
+        <div class="tech-icon-tag ai">AI</div>
+        <div class="tech-name">Whisper Small</div>
+        <div class="tech-desc">HuggingFace Transformers.js，WebGPU 加速</div>
+      </div>
+      <div class="tech-item reveal delay-3">
+        <div class="tech-icon-tag canvas">Canvas</div>
+        <div class="tech-name">Canvas 2D 渲染</div>
+        <div class="tech-desc">预览与导出共用绘制函数，1/8 缩放模糊优化</div>
+      </div>
+      <div class="tech-item reveal delay-3">
+        <div class="tech-icon-tag state">Zustand</div>
+        <div class="tech-name">Zustand v5 状态管理</div>
+        <div class="tech-desc">内置 undo/redo（50步），clips 片段管理</div>
+      </div>
+      <div class="tech-item reveal delay-4">
+        <div class="tech-icon-tag export">Export</div>
+        <div class="tech-name">MediaRecorder 导出</div>
+        <div class="tech-desc">Chrome 130+ 原生 MP4，旧版 FFmpeg WASM 转码</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- =============================================
+     SLIDE 8 — ARCHITECTURE
+     ============================================= -->
+<section class="slide" data-slide="7" style="background: var(--surface);">
+  <div class="slide-content" style="align-items: center;">
+    <div class="section-label reveal">架构设计</div>
+    <h2 class="section-title reveal delay-1">模块分层，关注点分离</h2>
+    <div class="arch-diagram">
+      <div class="arch-row reveal delay-2">
+        <div class="arch-box ui">SubtitlePanel<small>字幕/识别/翻译</small></div>
+        <div class="arch-box ui">TitlePanel<small>富文本编辑</small></div>
+        <div class="arch-box ui">BackgroundPanel<small>比例/模糊</small></div>
+        <div class="arch-box ui">TimelineBar<small>分割/删除/修剪</small></div>
+      </div>
+      <div class="arch-arrow reveal delay-3">↓</div>
+      <div class="arch-row reveal delay-3">
+        <div class="arch-box store" style="min-width: 200px;">projectStore (Zustand)<small>全局状态 + undo/redo</small></div>
+        <div class="arch-box logic" style="min-width: 200px;">drawFrame.ts<small>核心渲染函数</small></div>
+      </div>
+      <div class="arch-arrow reveal delay-4">↓</div>
+      <div class="arch-row reveal delay-4">
+        <div class="arch-box logic">VideoPreview<small>Canvas 预览 + 播放控制</small></div>
+        <div class="arch-box logic">ExportButton<small>MediaRecorder 录制</small></div>
+        <div class="arch-box worker">asr.worker<small>Whisper Web Worker</small></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- =============================================
+     SLIDE 9 — HIGHLIGHTS
+     ============================================= -->
+<section class="slide slide-highlights" data-slide="8">
+  <div class="slide-content" style="align-items: center;">
+    <div class="section-label reveal">项目亮点</div>
+    <h2 class="section-title reveal delay-1">用数据说话</h2>
+    <div class="highlight-grid">
+      <div class="highlight-card reveal delay-2">
+        <div class="highlight-number">0</div>
+        <div class="highlight-label">后端服务器</div>
+      </div>
+      <div class="highlight-card reveal delay-2">
+        <div class="highlight-number">100%</div>
+        <div class="highlight-label">浏览器本地处理</div>
+      </div>
+      <div class="highlight-card reveal delay-3">
+        <div class="highlight-number">~50x</div>
+        <div class="highlight-label">模糊渲染加速</div>
+      </div>
+      <div class="highlight-card reveal delay-3">
+        <div class="highlight-number">4</div>
+        <div class="highlight-label">字幕样式预设</div>
+      </div>
+      <div class="highlight-card reveal delay-4">
+        <div class="highlight-number">50</div>
+        <div class="highlight-label">步 undo/redo</div>
+      </div>
+      <div class="highlight-card reveal delay-4">
+        <div class="highlight-number">MP4</div>
+        <div class="highlight-label">原生导出</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- =============================================
+     SLIDE 10 — CTA / END
+     ============================================= -->
+<section class="slide slide-cta" data-slide="9">
+  <div class="slide-content" style="align-items: center;">
+    <div class="cta-content reveal">
+      <h2>开始使用 XCut</h2>
+      <p>
+        无需安装，无需注册，无需付费。<br>
+        打开浏览器，拖入视频，AI 帮你搞定字幕。
+      </p>
+      <button class="cta-btn" onclick="window.open('http://localhost:5173','_blank')">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+        立即体验
+      </button>
+      <div class="cta-stack">
+        <div class="cta-stack-item"><span class="dot purple"></span> React 19</div>
+        <div class="cta-stack-item"><span class="dot blue"></span> Whisper AI</div>
+        <div class="cta-stack-item"><span class="dot green"></span> 完全免费</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================
+     JAVASCRIPT — Navigation & Reveal
+     ============================================ -->
+<script>
+(function() {
+  const slides = document.querySelectorAll('.slide');
+  const totalSlides = slides.length;
+
+  // Progress bar
+  const progressBar = document.getElementById('progressBar');
+
+  // Nav dots
+  const navDotsContainer = document.getElementById('navDots');
+  slides.forEach((_, i) => {
+    const dot = document.createElement('button');
+    dot.className = 'nav-dot';
+    dot.setAttribute('aria-label', `Slide ${i + 1}`);
+    dot.addEventListener('click', () => {
+      slides[i].scrollIntoView({ behavior: 'smooth' });
+    });
+    navDotsContainer.appendChild(dot);
+  });
+  const dots = navDotsContainer.querySelectorAll('.nav-dot');
+
+  // Intersection Observer — reveal animations + active dot
+  const revealObserver = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        // Reveal elements
+        entry.target.querySelectorAll('.reveal, .reveal-scale, .reveal-left, .reveal-right').forEach(el => {
+          el.classList.add('visible');
+        });
+        // Update nav dots
+        const idx = parseInt(entry.target.dataset.slide);
+        dots.forEach((d, i) => d.classList.toggle('active', i === idx));
+        // Progress
+        progressBar.style.width = `${((idx + 1) / totalSlides) * 100}%`;
+      }
+    });
+  }, { threshold: 0.5 });
+
+  slides.forEach(s => revealObserver.observe(s));
+
+  // Keyboard navigation
+  let currentSlide = 0;
+  let isScrolling = false;
+
+  function goToSlide(index) {
+    if (index < 0 || index >= totalSlides || isScrolling) return;
+    isScrolling = true;
+    currentSlide = index;
+    slides[index].scrollIntoView({ behavior: 'smooth' });
+    setTimeout(() => { isScrolling = false; }, 600);
+  }
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowDown' || e.key === 'PageDown' || e.key === ' ') {
+      e.preventDefault();
+      goToSlide(currentSlide + 1);
+    } else if (e.key === 'ArrowUp' || e.key === 'PageUp') {
+      e.preventDefault();
+      goToSlide(currentSlide - 1);
+    } else if (e.key === 'Home') {
+      e.preventDefault();
+      goToSlide(0);
+    } else if (e.key === 'End') {
+      e.preventDefault();
+      goToSlide(totalSlides - 1);
+    }
+  });
+
+  // Track current slide from scroll
+  const scrollObserver = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        currentSlide = parseInt(entry.target.dataset.slide);
+      }
+    });
+  }, { threshold: 0.6 });
+  slides.forEach(s => scrollObserver.observe(s));
+
+  // Hide keyboard hint after first scroll
+  const hint = document.getElementById('keyHint');
+  let hintHidden = false;
+  window.addEventListener('scroll', () => {
+    if (!hintHidden && window.scrollY > 50) {
+      hint.style.opacity = '0';
+      hintHidden = true;
+    }
+  }, { passive: true });
+
+  // Touch support
+  let touchStartY = 0;
+  document.addEventListener('touchstart', (e) => {
+    touchStartY = e.touches[0].clientY;
+  }, { passive: true });
+  document.addEventListener('touchend', (e) => {
+    const dy = touchStartY - e.changedTouches[0].clientY;
+    if (Math.abs(dy) > 60) {
+      goToSlide(currentSlide + (dy > 0 ? 1 : -1));
+    }
+  }, { passive: true });
+})();
+</script>
+</body>
+</html>
