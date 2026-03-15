@@ -39,7 +39,11 @@
 |---------|-------------|
 | AI Speech Recognition | Whisper-based automatic subtitle generation, runs entirely in the browser via WebGPU |
 | Bilingual Subtitles | Chinese/English single-language or dual-language display (4 layout modes) |
+| Video Language Selection | In Chinese-only mode: choose "English video" (auto-translated to Simplified Chinese) or "Chinese video" (direct recognition) |
+| Simplified Chinese Output | Both translation and direct recognition output Simplified Chinese |
+| Custom Vocabulary | Built-in AI/Crypto glossary; add your own terms to improve accuracy |
 | Subtitle Styles | Netflix, plain text, stroke, Karaoke — with per-word font, size, bold, and color controls |
+| Bilingual Box | Netflix/Karaoke styles merge both languages into one background box |
 | Rich Text Titles | Per-character bold/color formatting; drag to any position; left/center/right alignment |
 | Aspect Ratios | 16:9, 9:16, 1:1, 4:3, 21:9 |
 | Gaussian Blur Background | Fills letterbox areas with a blurred video frame (5 intensity levels) |
@@ -65,7 +69,7 @@ cd xcut
 # https://github.com/marcosoccer211/xcut/archive/refs/heads/master.zip
 # Then unzip and cd into the folder.
 
-# Install dependencies (works out of the box — .npmrc handles peer dep resolution)
+# Install dependencies
 npm install
 
 # Start the development server
@@ -81,6 +85,92 @@ npm run build
 
 > **Note:** The app requires `COOP: same-origin` and `COEP: require-corp` headers (needed for SharedArrayBuffer / FFmpeg WASM). `npm run dev` sets these automatically via Vite config. For production deployment, configure your server to send these headers.
 
+### Usage Guide
+
+#### Step 1 — Upload a video
+
+Drag and drop a video file onto the right-side preview area, or click to select.
+Supported formats: MP4, MOV, WebM, and other common formats.
+
+#### Step 2 — Generate subtitles (Subtitle panel)
+
+Click the first icon in the left sidebar to open the Subtitle panel.
+
+**Choose a subtitle layout:**
+- `No subtitles` — hide subtitles
+- `English only` — English subtitles only
+- `Chinese only` — Chinese subtitles only
+- `EN top / ZH bottom` — bilingual, English above Chinese
+- `ZH top / EN bottom` — bilingual, Chinese above English
+
+**In Chinese-only mode, select the video language:**
+- `English video` (default) — Whisper recognizes English, then auto-translates to Simplified Chinese
+- `Chinese video` — Whisper directly recognizes Mandarin and outputs Simplified Chinese
+
+**Add custom vocabulary (optional):**
+Type terms (channel names, product names, etc.) in the "Custom vocabulary" box and press Enter.
+Built-in glossaries: AI terms (Claude, GPT, RAG…) and Crypto terms (Bitcoin, DeFi…).
+
+**Start recognition:**
+Click "Start recognition". The first run downloads the Whisper model (~200 MB) — please wait.
+Bilingual mode auto-translates after recognition finishes.
+
+**Edit subtitle segments:**
+All segments appear in a list below. Click a segment to edit its text, or click × to delete it.
+
+#### Step 3 — Adjust subtitle style
+
+| Preset | Effect |
+|--------|--------|
+| Netflix | Semi-transparent dark background, rounded corners, white text |
+| Plain text | White text only, no background |
+| Stroke | White text with black outline |
+| Karaoke | Yellow text, semi-transparent background |
+
+You can also adjust: **Font**, **Size**, **Bold**, and **Color** independently for English and Chinese.
+
+> In bilingual Netflix / Karaoke mode, both languages share one background box and have a single position control.
+
+#### Step 4 — Adjust subtitle position
+
+Use the sliders in the "Subtitle position" area to set horizontal and vertical position (0% = top/left, 100% = bottom/right).
+In bilingual plain-text / stroke mode, English and Chinese positions are independent.
+
+#### Step 5 — Add a title (Title panel)
+
+1. Enable the title toggle in the top-right of the panel
+2. Type your title; press **Enter** for a new line
+3. Select text and click **Bold** or the color picker to style individual characters
+4. Set alignment: left / center / right
+5. Adjust global font, size, bold, and color in "Global style"
+6. Drag the position sliders to place the title anywhere on the video
+
+> Tip: titles work great in the letterbox areas when using a 9:16 vertical layout.
+
+#### Step 6 — Background & aspect ratio (Background panel)
+
+| Ratio | Best for |
+|-------|----------|
+| 16:9 | Landscape video — YouTube, Bilibili |
+| 9:16 | Vertical short video — TikTok, X, Xiaohongshu |
+| 1:1 | Square — Instagram posts |
+| 4:3 | Traditional screen |
+| 21:9 | Ultrawide, cinematic look |
+
+**Blur background:** when the video ratio doesn't match the canvas, adjust the "Blur level" slider to fill the letterbox areas with a blurred video frame — similar to how TikTok handles vertical video.
+
+#### Step 7 — Export
+
+Click the export button in the top-right corner:
+
+- **SRT** — subtitle file only (shown when subtitles exist)
+- **Export MP4** — records the canvas and outputs an MP4 with subtitles, title, and background effects baked in
+
+> Export notes:
+> - Export is real-time recording, so it takes as long as the video duration
+> - Chrome 130+ records natively as MP4; older browsers record WebM then transcode via FFmpeg (takes extra time)
+> - Audio plays normally during export
+
 ### Keyboard Shortcuts
 
 | Shortcut | Action |
@@ -94,6 +184,23 @@ npm run build
 - **Browser:** Chrome 130+ or Edge (latest). Requires WebAssembly, Web Workers, and Canvas API.
 - **RAM:** 8 GB+ recommended for large video files.
 - **Storage:** ~200 MB for the Whisper model cache (downloaded once, then cached in the browser).
+
+### FAQ
+
+**Q: Clicking "Start recognition" does nothing?**
+A: Make sure a video is loaded first. The first run downloads the model — wait a few minutes.
+
+**Q: Chinese subtitles are in Traditional Chinese?**
+A: In "Chinese only" mode, select "English video" as the video language — this uses the recognition + translation path, which outputs Simplified Chinese.
+
+**Q: Proper nouns are recognized incorrectly?**
+A: Add the term to "Custom vocabulary" and re-run recognition.
+
+**Q: The exported video has no subtitles?**
+A: Export records the canvas — make sure subtitles are visible in the preview first. Also check that the layout is not set to "No subtitles".
+
+**Q: COOP/COEP error in the browser?**
+A: Run the app on `localhost` or HTTPS. `npm run dev` handles this automatically.
 
 ### Tech Stack
 
@@ -137,8 +244,7 @@ xcut/
 │           └── RecordingPanel.tsx      # Screen + camera PiP recording
 ├── index.html
 ├── vite.config.ts
-├── package.json
-└── CLAUDE.md                   # Architecture notes for AI assistants / contributors
+└── package.json
 ```
 
 ### Roadmap
@@ -359,15 +465,73 @@ A: 导出使用 canvas 录制，确保预览里字幕显示正常再导出。检
 **Q: 页面报错 COOP/COEP？**
 A: 需要在 localhost 或 HTTPS 环境运行，执行 `npm run dev` 即可。
 
+### 技术栈
+
+| 层 | 技术 |
+|----|------|
+| 框架 | React 19 + TypeScript + Vite 8 |
+| 样式 | Tailwind CSS v4 + Framer Motion |
+| AI 识别 | `@huggingface/transformers`（Whisper small，WebGPU 加速） |
+| 导出 | MediaRecorder（canvas 录制）+ `@ffmpeg/ffmpeg`（WebM→MP4 转码 fallback） |
+| 翻译 | MyMemory 免费 API |
+| 状态管理 | Zustand v5（含撤销/重做历史） |
+| 字体 | Inter · Cormorant Garamond · Noto Serif SC · Plus Jakarta Sans |
+
+### 目录结构
+
+```
+xcut/
+├── public/                     # 静态资源
+├── docs/
+│   ├── presentation.html       # 作品集展示页（纯 HTML/CSS/JS）
+│   └── screenshots/            # README 截图
+├── src/
+│   ├── types/index.ts          # 所有 TS 类型定义
+│   ├── stores/projectStore.ts  # Zustand 全局状态 + undo/redo
+│   ├── constants/
+│   │   └── vocabulary.ts       # AI/Crypto 词库 + Whisper prompt 构建
+│   ├── lib/
+│   │   ├── drawFrame.ts        # ★ 核心 canvas 渲染（预览和导出共用）
+│   │   └── utils.ts            # 工具函数：比例计算、时间格式化等
+│   ├── workers/
+│   │   └── asr.worker.ts       # Whisper Web Worker（LOAD / TRANSCRIBE 消息）
+│   └── components/
+│       ├── layout/Sidebar.tsx          # 左侧导航 + 撤销/重做按钮
+│       ├── export/ExportButton.tsx     # MP4 + SRT 导出逻辑
+│       ├── preview/VideoPreview.tsx    # Canvas 预览 + 播放控制 + 多片段跳转
+│       ├── timeline/TimelineBar.tsx    # 时间轴编辑器（分割/删除/修剪）
+│       └── panels/
+│           ├── SubtitlePanel.tsx       # 字幕面板（布局/识别/风格/位置）
+│           ├── TitlePanel.tsx          # 标题富文本编辑器
+│           ├── BackgroundPanel.tsx     # 背景比例 + 模糊设置
+│           └── RecordingPanel.tsx      # 录屏面板（屏幕+摄像头 PiP）
+├── index.html
+├── vite.config.ts
+└── package.json
+```
+
+### Roadmap
+
+- [ ] 导出进度条（FFmpeg 转码阶段）
+- [ ] 双语模式支持中文音频源
+- [ ] 导出分辨率选项（目前固定 1280px 宽）
+- [ ] 标题动画效果（淡入、打字机）
+- [ ] 多段标题（不同时间段显示不同标题）
+- [ ] 离线 PWA（缓存模型和 FFmpeg）
+- [x] 时间轴剪辑（分割/删除/修剪）
+- [x] 录屏功能（屏幕+摄像头 PiP）
+- [x] 多片段导出
+
 ### 参与贡献
 
 欢迎提交 Issue 和 Pull Request！
 
 1. Fork 本仓库
 2. 创建功能分支：`git checkout -b feature/my-feature`
-3. 提交更改：`git commit -m 'Add my feature'`
-4. 推送分支：`git push origin feature/my-feature`
-5. 发起 Pull Request
+3. 运行 lint 检查：`npm run lint`
+4. 提交更改：`git commit -m 'Add my feature'`
+5. 推送分支：`git push origin feature/my-feature`
+6. 发起 Pull Request
 
 较大改动前请先阅读上方的「目录结构」章节，了解各模块职责。
 
