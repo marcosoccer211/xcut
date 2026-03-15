@@ -164,7 +164,7 @@ Contributions, issues, and feature requests are welcome!
 5. Push to the branch: `git push origin feature/my-feature`
 6. Open a Pull Request
 
-Please read `CLAUDE.md` for a detailed architecture overview before making larger changes.
+For a detailed architecture overview, see the [Directory Structure](#directory-structure) section above.
 
 ### License
 
@@ -369,7 +369,7 @@ A: 需要在 localhost 或 HTTPS 环境运行，执行 `npm run dev` 即可。
 4. 推送分支：`git push origin feature/my-feature`
 5. 发起 Pull Request
 
-较大改动前请先阅读 `CLAUDE.md`，里面有详细的架构说明。
+较大改动前请先阅读上方的「目录结构」章节，了解各模块职责。
 
 ### 开源协议
 
