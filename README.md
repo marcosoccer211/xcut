@@ -62,7 +62,7 @@ git clone https://github.com/marcosoccer211/xcut.git
 cd xcut
 
 # No Git? Download the ZIP instead:
-# https://github.com/marcosoccer211/xcut/archive/refs/heads/main.zip
+# https://github.com/marcosoccer211/xcut/archive/refs/heads/master.zip
 # Then unzip and cd into the folder.
 
 # Install dependencies (works out of the box — .npmrc handles peer dep resolution)
@@ -219,7 +219,7 @@ git clone https://github.com/marcosoccer211/xcut.git
 cd xcut
 
 # 没有 Git？也可以直接下载 ZIP：
-# https://github.com/marcosoccer211/xcut/archive/refs/heads/main.zip
+# https://github.com/marcosoccer211/xcut/archive/refs/heads/master.zip
 # 解压后进入文件夹，再继续后续步骤。
 
 npm install
